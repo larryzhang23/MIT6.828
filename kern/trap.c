@@ -59,12 +59,44 @@ static const char *trapname(int trapno)
 }
 
 
-void
+void 
 trap_init(void)
 {
 	extern struct Segdesc gdt[];
 
 	// LAB 3: Your code here.
+	void th0();
+    void th1();
+    void th3();
+    void th4();
+	void th5();
+	void th6();
+	void th7();
+	void th8();
+	void th10();
+	void th11();
+	void th12();
+	void th13();
+	void th14();
+	void th16();
+	void sys_call();
+
+	/** all set as interrupt(istrap = 0) to prevent the influences led by INTR interrupts **/
+	SETGATE(idt[T_DIVIDE], 0, GD_KT, th0, 0);
+	SETGATE(idt[T_DEBUG], 0, GD_KT, th1, 0);
+	SETGATE(idt[T_BRKPT], 0, GD_KT, th3, 3);
+	SETGATE(idt[T_OFLOW], 0, GD_KT, th4, 0);
+	SETGATE(idt[T_BOUND], 0, GD_KT, th5, 0);
+	SETGATE(idt[T_ILLOP], 0, GD_KT, th6, 0);
+	SETGATE(idt[T_DEVICE], 0, GD_KT, th7, 0);
+	SETGATE(idt[T_DBLFLT], 0, GD_KT, th8, 0);	
+	SETGATE(idt[10], 0, GD_KT, th10, 0);
+	SETGATE(idt[11], 0, GD_KT, th11, 0);
+	SETGATE(idt[12], 0, GD_KT, th12, 0);
+	SETGATE(idt[13], 0, GD_KT, th13, 0);
+	SETGATE(idt[14], 0, GD_KT, th14, 0);
+	SETGATE(idt[16], 0, GD_KT, th16, 0);
+	SETGATE(idt[48], 0, GD_KT, sys_call, 3);
 
 	// Per-CPU setup 
 	trap_init_percpu();
@@ -144,7 +176,16 @@ trap_dispatch(struct Trapframe *tf)
 {
 	// Handle processor exceptions.
 	// LAB 3: Your code here.
-
+	switch (tf->tf_trapno){
+		case T_BRKPT: monitor(tf); return;
+		case T_PGFLT: page_fault_handler(tf); return;
+		case T_SYSCALL: tf->tf_regs.reg_eax = syscall(tf->tf_regs.reg_eax, 
+													  tf->tf_regs.reg_edx, 
+													  tf->tf_regs.reg_ecx, 
+								                      tf->tf_regs.reg_ebx, 
+													  tf->tf_regs.reg_edi, 
+													  tf->tf_regs.reg_esi); return;
+	}
 	// Unexpected trap: The user process or the kernel has a bug.
 	print_trapframe(tf);
 	if (tf->tf_cs == GD_KT)
@@ -205,7 +246,18 @@ page_fault_handler(struct Trapframe *tf)
 	// Handle kernel-mode page faults.
 
 	// LAB 3: Your code here.
-
+	if ((tf->tf_cs & 3) == 0){
+		panic("page_fault in kernel.");
+		/**
+		struct PageInfo *pp = page_alloc(0);
+		if (pp == NULL)
+			panic("unable to alloc page in page_fault_handler.\n");
+		int i;
+		if ((i = page_insert(kern_pgdir, pp, (void *) fault_va, PTE_W)) < 0)
+			panic("unable to insert page in page_fault_handler.\n");
+		**/
+	}
+	
 	// We've already handled kernel-mode exceptions, so if we get here,
 	// the page fault happened in user mode.
 
@@ -214,5 +266,6 @@ page_fault_handler(struct Trapframe *tf)
 		curenv->env_id, fault_va, tf->tf_eip);
 	print_trapframe(tf);
 	env_destroy(curenv);
+	
 }
 

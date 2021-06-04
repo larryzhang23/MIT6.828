@@ -135,7 +135,6 @@ mem_init(void)
 	// create initial page directory.
 	kern_pgdir = (pde_t *) boot_alloc(PGSIZE);
 	memset(kern_pgdir, 0, PGSIZE);
-	cprintf("kern_pgdir va=%p\n", kern_pgdir);
 	//////////////////////////////////////////////////////////////////////
 	// Recursively insert PD in itself as a page table, to form
 	// a virtual page table at virtual address UVPT.
@@ -377,7 +376,7 @@ pgdir_walk(pde_t *pgdir, const void *va, int create)
 	// pde_t *pgtab = &pgdir[PDX(va)];  
 	/** this writting is the same as the one above **/
 	pde_t *pgtab = pgdir + PDX(va);
-	pte_t *pg;
+	pte_t *pg = NULL;
 	if (!(*pgtab & PTE_P)){
 		if (!create)
 			return NULL;
@@ -514,7 +513,7 @@ void
 page_remove(pde_t *pgdir, void *va)
 {
 	// Fill this function in
-	pte_t *pg_store;
+	pte_t *pg_store = NULL;
 	struct PageInfo *pp = page_lookup(pgdir, va, &pg_store);
 	if (pp != NULL){
 		page_decref(pp);
@@ -559,7 +558,33 @@ int
 user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 {
 	// LAB 3: Your code here.
+	/** rounddown operation is necessary, but why? **/
+	uintptr_t va_t = (uintptr_t) ROUNDDOWN(va, PGSIZE);
+	uintptr_t va_end = ROUNDUP(va_t+len, PGSIZE);
 
+	int check_perm = perm | PTE_P | PTE_U;
+	for (uintptr_t i = va_t; i < va_end; i += PGSIZE){
+		pte_t *pg = pgdir_walk(env->env_pgdir, (void *) i, 0);
+		if ((i >= ULIM) || (pg == NULL) || ((*pg & check_perm) != check_perm)){
+			user_mem_check_addr = i < (uintptr_t) va ? (uintptr_t) va: i;
+			return -E_FAULT;
+		}
+	}
+	/**
+	uintptr_t va_t = (uintptr_t) ROUNDDOWN(va, PGSIZE);
+	uint32_t pgs = len / PGSIZE;
+	if (len % PGSIZE != 0)
+		pgs++;
+
+	int check_perm = perm | PTE_P | PTE_U;
+	for (uint32_t i = 0; i < pgs; i++){
+		pte_t *pg = pgdir_walk(env->env_pgdir, (void *) va_t, 0);
+		if ((va_t >= ULIM) || (pg == NULL) || ((*pg & check_perm) != check_perm)){
+			user_mem_check_addr = va_t;
+			return -E_FAULT;
+		}
+		va_t += PGSIZE;
+	}**/
 	return 0;
 }
 
