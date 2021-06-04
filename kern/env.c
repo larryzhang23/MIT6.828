@@ -291,7 +291,7 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
 	uint8_t *va_t = ROUNDDOWN((uint8_t *) va, PGSIZE); // is necessary or there will be 
-	uint8_t *va_t_end = ROUNDUP(va_t + len, PGSIZE);
+	uint8_t *va_t_end = ROUNDUP((uint8_t *) va+ len, PGSIZE);
 	struct PageInfo *phys_pg = NULL;
 
 	for (; va_t < va_t_end; va_t += PGSIZE){

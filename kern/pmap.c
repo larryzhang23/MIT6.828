@@ -630,7 +630,7 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 	// LAB 3: Your code here.
 	/** rounddown operation is necessary, but why? **/
 	uintptr_t va_t = (uintptr_t) ROUNDDOWN(va, PGSIZE);
-	uintptr_t va_end = ROUNDUP(va_t+len, PGSIZE);
+	uintptr_t va_end = ROUNDUP((uintptr_t) va + len, PGSIZE);
 
 	int check_perm = perm | PTE_P | PTE_U;
 	for (uintptr_t i = va_t; i < va_end; i += PGSIZE){
@@ -650,7 +650,7 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 	for (uint32_t i = 0; i < pgs; i++){
 		pte_t *pg = pgdir_walk(env->env_pgdir, (void *) va_t, 0);
 		if ((va_t >= ULIM) || (pg == NULL) || ((*pg & check_perm) != check_perm)){
-			user_mem_check_addr = va_t;
+			user_mem_check_addr = va_t < (uintptr_t) va ? (uintptr_t) va: va_t;
 			return -E_FAULT;
 		}
 		va_t += PGSIZE;
