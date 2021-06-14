@@ -258,7 +258,7 @@ env_alloc(struct Env **newenv_store, envid_t parent_id)
 
 	// Enable interrupts while in user mode.
 	// LAB 4: Your code here.
-
+	e->env_tf.tf_eflags |= FL_IF;
 	// Clear the page fault handler until user installs one.
 	e->env_pgfault_upcall = 0;
 
@@ -291,7 +291,7 @@ region_alloc(struct Env *e, void *va, size_t len)
 	//   You should round va down, and round (va + len) up.
 	//   (Watch out for corner-cases!)
 	uint8_t *va_t = ROUNDDOWN((uint8_t *) va, PGSIZE); // is necessary or there will be 
-	uint8_t *va_t_end = ROUNDUP((uint8_t *) va+ len, PGSIZE);
+	uint8_t *va_t_end = ROUNDUP((uint8_t *) va + len, PGSIZE);
 	struct PageInfo *phys_pg = NULL;
 
 	for (; va_t < va_t_end; va_t += PGSIZE){
@@ -386,8 +386,10 @@ load_icode(struct Env *e, uint8_t *binary)
 	struct PageInfo *pp = page_alloc(0);
 	if (pp == NULL)
 		panic("unable to alloc page for USTACK.");
-	pp->pp_ref++;
-	page_insert(e->env_pgdir, pp, (void *) (USTACKTOP - PGSIZE), PTE_U | PTE_W);
+	int sign = page_insert(e->env_pgdir, pp, (void *) (USTACKTOP - PGSIZE), PTE_U | PTE_W);
+	if (sign < 0)
+		cprintf("insert failed for %e.\n", sign);
+	
 }
 
 //
@@ -540,13 +542,14 @@ env_run(struct Env *e)
 	//	e->env_tf to sensible values.
 
 	// LAB 3: Your code here.
-	//cprintf("curenv = NULL? %d\n", curenv == NULL);
+	//cprintf("arrive here with env[%d].\n", ENVX(e->env_id));
 	if (curenv != NULL && curenv->env_status == ENV_RUNNING)
 		curenv->env_status = ENV_RUNNABLE;
 	curenv = e;
 	e->env_status = ENV_RUNNING;
 	e->env_runs++;
 	lcr3(PADDR(e->env_pgdir));
+	unlock_kernel();
 	env_pop_tf(&e->env_tf);
 	
 }

@@ -136,6 +136,7 @@ mem_init(void)
 	//////////////////////////////////////////////////////////////////////
 	// create initial page directory.
 	kern_pgdir = (pde_t *) boot_alloc(PGSIZE);
+	cprintf("kern_pgdir = %p.\n", kern_pgdir);
 	memset(kern_pgdir, 0, PGSIZE);
 	//////////////////////////////////////////////////////////////////////
 	// Recursively insert PD in itself as a page table, to form
@@ -266,7 +267,13 @@ mem_init_mp(void)
 	//     Permissions: kernel RW, user NONE
 	//
 	// LAB 4: Your code here:
-
+	uintptr_t stacktop_i = KSTACKTOP;
+	for (int i = 0; i < NCPU; i++){
+		boot_map_region(kern_pgdir, stacktop_i - KSTKSIZE, KSTKSIZE, PADDR(percpu_kstacks[i]), PTE_W);
+		stacktop_i -=  (KSTKSIZE + KSTKGAP);	
+	}
+	
+	
 }
 
 // --------------------------------------------------------------
@@ -309,8 +316,9 @@ page_init(void)
 	size_t io_hole_start = (size_t) IOPHYSMEM / PGSIZE;
 	void * kern_end = boot_alloc(0);
 	size_t kern_end_start = (size_t) PADDR(kern_end) / PGSIZE; 
+	size_t mpentry_idx = MPENTRY_PADDR / PGSIZE;
 	for (i = 0; i < npages; i++) {
-		if (i == 0){
+		if (i == 0 || i == mpentry_idx){
 			pages[i].pp_ref = 1;
 			pages[i].pp_link = NULL;
 		}else if (i >= io_hole_start && i < kern_end_start){
@@ -451,6 +459,11 @@ boot_map_region(pde_t *pgdir, uintptr_t va, size_t size, physaddr_t pa, int perm
 		pte_t *pg = pgdir_walk(pgdir, (void *)va, true);
 		if (pg == NULL)
 			panic("unable to alloc page for page table.\n");
+		/** if we add the codes below, a bug will show. But why? **/
+		/**
+		if (*pg & PTE_P)
+			page_remove(pgdir, (void *) va);
+	    **/
 		*pg = pa | perm | PTE_P;
 		pgdir[PDX(va)] |= perm;
 		va += PGSIZE;
@@ -601,7 +614,16 @@ mmio_map_region(physaddr_t pa, size_t size)
 	// Hint: The staff solution uses boot_map_region.
 	//
 	// Your code here:
-	panic("mmio_map_region not implemented");
+	uintptr_t pa_end = ROUNDUP(pa + size, PGSIZE);
+	uintptr_t pa_t = ROUNDDOWN(pa, PGSIZE);
+	size_t round_size = pa_end - pa_t; 
+	if ((base + round_size) >= MMIOLIM)
+		panic("mmio memory out.");
+	boot_map_region(kern_pgdir, base, round_size, pa_t, PTE_W | PTE_PCD | PTE_PWT);
+	uintptr_t *mem = (uintptr_t *) base;
+	base  = ROUNDUP(base + round_size, PGSIZE);
+	return mem;
+	//panic("mmio_map_region not implemented");
 }
 
 static uintptr_t user_mem_check_addr;
@@ -666,12 +688,12 @@ user_mem_check(struct Env *env, const void *va, size_t len, int perm)
 // environment, this function will not return.
 //
 void
-user_mem_assert(struct Env *env, const void *va, size_t len, int perm)
+user_mem_assert(struct Env *e, const void *va, size_t len, int perm)
 {
-	if (user_mem_check(env, va, len, perm | PTE_U) < 0) {
+	if (user_mem_check(e, va, len, perm | PTE_U) < 0) {
 		cprintf("[%08x] user_mem_check assertion failure for "
-			"va %08x\n", env->env_id, user_mem_check_addr);
-		env_destroy(env);	// may not return
+			"va %08x\n", e->env_id, user_mem_check_addr);
+		env_destroy(e);	// may not return
 	}
 }
 
