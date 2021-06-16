@@ -17,7 +17,7 @@
 //	trap-time eip
 //	utf_regs.reg_eax
 //	...
-//	utf_regs.reg_esi
+//	utf_regs.reg_esipushl %eip
 //	utf_regs.reg_edi
 //	utf_err (error code)
 //	utf_fault_va            <-- %esp
@@ -65,18 +65,37 @@ _pgfault_upcall:
 	// ways as registers become unavailable as scratch space.
 	//
 	// LAB 4: Your code here.
-
+	/** what's the problem of the codes below ? **/
+	/**
+	addl $8, %esp     // jump across utf_fault_va and utf_err
+	movl %esp, %eax   // store the current %esp in %eax in order to come back
+	addl $32, %esp
+	popl %ecx
+	addl $4, %esp
+	popl %esp        // enter the old stack(env stack before page fault)
+	pushl %ecx       // push the old %eip into it(env %eip leading to the page fault)
+	movl %eax, %esp  // return to the trap-time stack
+	**/
+	addl $8, %esp			// jump across utf_fault_va and utf_err
+	movl 40(%esp), %eax 	// save the original env's %esp value into %eax
+	movl 32(%esp), %ecx 	// save the original env's %eip value into %ecx
+	movl %ecx, -4(%eax) 	// load the original env's %eip value into the original %esp stack 
+	
 	// Restore the trap-time registers.  After you do this, you
 	// can no longer modify any general-purpose registers.
 	// LAB 4: Your code here.
-
+	popal
 	// Restore eflags from the stack.  After you do this, you can
 	// no longer use arithmetic operations or anything else that
 	// modifies eflags.
 	// LAB 4: Your code here.
-
+	addl $4, %esp
+	popfl
 	// Switch back to the adjusted trap-time stack.
 	// LAB 4: Your code here.
-
+	popl %esp        // change to the old stack
 	// Return to re-execute the instruction that faulted.
 	// LAB 4: Your code here.
+	lea -4(%esp), %esp		//因为之前压入了eip的值但是没有减esp的值，所以现在需要将esp寄存器中的值减4
+	ret             // return to the old %eip
+	
