@@ -25,7 +25,9 @@ fsipc(unsigned type, void *dstva)
 		cprintf("[%08x] fsipc %d %08x\n", thisenv->env_id, type, *(uint32_t *)&fsipcbuf);
 
 	ipc_send(fsenv, type, &fsipcbuf, PTE_P | PTE_W | PTE_U);
-	return ipc_recv(NULL, dstva, NULL);
+	int32_t r = ipc_recv(NULL, dstva, NULL);
+	//cprintf("fsipc r = %d.\n", r);
+	return r;
 }
 
 static int devfile_flush(struct Fd *fd);
@@ -141,7 +143,12 @@ devfile_write(struct Fd *fd, const void *buf, size_t n)
 	// remember that write is always allowed to write *fewer*
 	// bytes than requested.
 	// LAB 5: Your code here
-	panic("devfile_write not implemented");
+	// panic("devfile_write not implemented");
+	assert(n <= sizeof(fsipcbuf.write.req_buf));
+	fsipcbuf.write.req_fileid = fd->fd_file.id;
+	fsipcbuf.write.req_n = n;
+	memcpy(fsipcbuf.write.req_buf, buf, n); 
+	return fsipc(FSREQ_WRITE, NULL);
 }
 
 static int

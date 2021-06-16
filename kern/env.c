@@ -409,13 +409,12 @@ env_create(uint8_t *binary, enum EnvType type)
 	
 	struct Env *e = NULL;
 	int sign;
-	if ((sign = env_alloc(&e, 0)) < 0){
-		cprintf("create new env failed for %e.\n", sign);
-		panic("");
-	}
+	if ((sign = env_alloc(&e, 0)) < 0)
+		panic("create new env failed for %e.\n", sign);
 	load_icode(e, binary);
 	e->env_type = type;
-
+	if (type == ENV_TYPE_FS)
+		e->env_tf.tf_eflags |= FL_IOPL_3;  // when CPL <= IOPL, the env can have access to io.
 }
 
 //

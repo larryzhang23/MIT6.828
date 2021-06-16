@@ -93,7 +93,7 @@ trap_init(void)
 	void irq7();
 	void irq14();
 	void irq19();
-
+	
 	/** all set as interrupt(istrap = 0) to prevent the influences led by INTR interrupts **/
 	SETGATE(idt[T_DIVIDE], 0, GD_KT, th0, 0);
 	SETGATE(idt[T_DEBUG], 0, GD_KT, th1, 0);
@@ -247,6 +247,8 @@ trap_dispatch(struct Trapframe *tf)
 													  tf->tf_regs.reg_edi, 
 													  tf->tf_regs.reg_esi); return;
 		case IRQ_OFFSET + IRQ_TIMER: lapic_eoi(); sched_yield(); return;
+		case IRQ_OFFSET + IRQ_SERIAL: lapic_eoi(); serial_intr(); return;
+		case IRQ_OFFSET + IRQ_KBD: lapic_eoi(); kbd_intr(); return;
 	}
 
 	// Unexpected trap: The user process or the kernel has a bug.

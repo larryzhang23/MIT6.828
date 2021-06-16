@@ -214,7 +214,14 @@ serve_read(envid_t envid, union Fsipc *ipc)
 		cprintf("serve_read %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
 
 	// Lab 5: Your code here:
-	return 0;
+	ssize_t r;
+	struct OpenFile *o;
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+		return r;
+	if ((r = file_read(o->o_file, ret->ret_buf, req->req_n, o->o_fd->fd_offset)) < 0)
+		return r;
+	o->o_fd->fd_offset += r;
+	return r;
 }
 
 
@@ -229,7 +236,17 @@ serve_write(envid_t envid, struct Fsreq_write *req)
 		cprintf("serve_write %08x %08x %08x\n", envid, req->req_fileid, req->req_n);
 
 	// LAB 5: Your code here.
-	panic("serve_write not implemented");
+	// panic("serve_write not implemented");
+	ssize_t r;
+	struct OpenFile *o;
+	if ((r = openfile_lookup(envid, req->req_fileid, &o)) < 0)
+		return r;
+	//cprintf("req_buf: %s.\n", req->req_buf);
+	if ((r = file_write(o->o_file, req->req_buf, req->req_n, o->o_fd->fd_offset)) < 0)
+		return r;
+	//cprintf("in serve_write: r = %d.\n", r);
+	o->o_fd->fd_offset += r;
+	return r;
 }
 
 // Stat ipc->stat.req_fileid.  Return the file's struct Stat to the
@@ -321,6 +338,8 @@ serve(void)
 			cprintf("Invalid request code %d from %08x\n", req, whom);
 			r = -E_INVAL;
 		}
+		//cprintf("req: %d, serve r = %d.\n", req, r);
+		//cprintf("perm = %d.\n", perm);
 		ipc_send(whom, r, pg, perm);
 		sys_page_unmap(0, fsreq);
 	}
@@ -339,7 +358,7 @@ umain(int argc, char **argv)
 
 	serve_init();
 	fs_init();
-        fs_test();
+    fs_test();
 	serve();
 }
 

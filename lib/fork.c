@@ -86,7 +86,12 @@ duppage(envid_t envid, unsigned pn)
 	// LAB 4: Your code here.
 	//panic("duppage not implemented");
 	void *addr = (uintptr_t *) (pn * PGSIZE);
-	if ((uvpt[pn] & PTE_W) || (uvpt[pn] & PTE_COW)){
+	/** PTE_SHARE check must be implemented at first, because PTE_SHARE can also be set with PTE_W leading to implementing PTE_COW **/
+	if (uvpt[pn] & PTE_SHARE){
+		if ((r = sys_page_map(0, addr, envid, addr, uvpt[pn] & PTE_SYSCALL)) < 0)
+			panic("err %e happens in remapping parent's pages in PTE_SHARE.", r);
+	}
+	else if ((uvpt[pn] & PTE_W) || (uvpt[pn] & PTE_COW)){
 		r = sys_page_map(0, addr, envid, addr, PTE_U | PTE_COW);
 		if (r < 0)
 			panic("err %e happens in mapping parent's pages which are PTE_W or PTE_COW to child's.", r);
@@ -94,9 +99,7 @@ duppage(envid_t envid, unsigned pn)
 		r = sys_page_map(0, addr, 0, addr, PTE_U | PTE_COW);
 		if (r < 0)
 			panic("err %e happens in remapping parent's pages in PTE_COW.", r);
-	}else if (uvpt[pn] & PTE_SHARE){
-		if ((r = sys_page_map(0, addr, envid, addr, PTE_SYSCALL)) < 0)
-			panic("err %e happens in remapping parent's pages in PTE_SHARE.", r);
+	
 	}else{
 		if ((r = sys_page_map(0, addr, envid, addr, PTE_U)) < 0)
 			panic("err %e happen in mapping parent's pages which are only PTE_U to child's.", r);
